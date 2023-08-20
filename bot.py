@@ -3,33 +3,67 @@ import aiofiles
 import os
 import chainlit as cl 
 from google.ai import generativelanguage as glm
-import pprint
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+from langchain import PromptTemplate, LLMChain
+from langchain.chat_models import ChatGooglePalm
 
 # Read API key from the text file
 with open('api.sty', 'r') as file:
-    api = file.read().strip()
+    api_key = file.read().strip()
 
 # Configure the Google API key
 client = glm.DiscussServiceClient(
-    client_options={'api_key':api})
+    client_options={'api_key':api_key})
+
+chat = ChatGooglePalm(
+    model_name='models/chat-bison-001',
+    temperature=0.5,
+    top_k=2048,
+    google_api_key=api_key
+)
+
+# Sample template
+template = """Question: {question}  
+Answer: Let's think step by step"""
+
+# Promt Template 
+prompt = PromptTemplate(template=template, input_variables=['question'])
+
+# Initiate LLM
+llm_chain = LLMChain(
+    prompt=prompt, 
+    llm=chat,
+    verbose=True
+)
 
 
 # Create a function to generate AI response
 async def generate_ai_response(input_text):
-    request = glm.GenerateMessageRequest(
-        model='models/chat-bison-001',
-        temperature=0.5,
-        top_k=2048,
-        prompt=glm.MessagePrompt(
-            messages=[glm.Message(content=input_text)]))
 
-    result = client.generate_message(request)
-    if result.candidates:  # Check if candidates list is not empty
-        return str(result.candidates[0].content)
-    else:
-        return "No response available."
+    res = await llm_chain.acall(input_text, callbacks= [cl.AsyncLangchainCallbackHandler()])
+
+    if res != None:
+        return res 
+    else : 
+        return "No response available"
     
+
+    # This is how to use the chatbot without LLM wrapper
+    # Do not delete this ---------------------------------------------------------
+    # request = glm.GenerateMessageRequest(                                      |
+    #     model='models/chat-bison-001',                                         |
+    #     temperature=0.5,                                                       |
+    #     top_k=2048,                                                            |
+    #     prompt=glm.MessagePrompt(                                              |
+    #         messages=[glm.Message(content=input_text)]))                       |
+    #                                                                            |        
+    # result = client.generate_message(request)                                  |
+    # if result.candidates:  # Check if candidates list is not empty             |
+    #     return str(result.candidates[0].content)                               |
+    # else:                                                                      |
+    #     return "No response available."                                        |
+    #-----------------------------------------------------------------------------
+
 
 #Create action button----- This can be used to create button to perform difference action such as upload picture , file , etc.
 @cl.action_callback("Start Chat")
@@ -185,7 +219,7 @@ async def sendFile(action):
 
 
     await cl.Message(
-        content=result,
+        content=result['text'],
         author='Tool 1',
         actions=SendFile
     ).send()
@@ -211,7 +245,7 @@ async def main(message: str):
     result = await generate_ai_response(message)
 
 
-    await cl.Message(content=result,author='Tool 1',actions=SendFile).send()
+    await cl.Message(content=result['text'],author='Tool 1',actions=SendFile).send()
 
 
 # Download file -------------------------------------------------------
