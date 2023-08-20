@@ -1,1 +1,2 @@
 [Your api key]
+and remember to change file name in line 10 of bot.py

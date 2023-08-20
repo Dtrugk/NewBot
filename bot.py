@@ -4,10 +4,10 @@ import os
 import chainlit as cl 
 from google.ai import generativelanguage as glm
 import pprint
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 # Read API key from the text file
-with open('APIKEY.sty', 'r') as file:
+with open('api.sty', 'r') as file:
     api = file.read().strip()
 
 # Configure the Google API key
