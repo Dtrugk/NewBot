@@ -1,4 +1,5 @@
-#Code start from there 
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import ConversationChain
 from langchain.chat_models import ChatGooglePalm
 from google.ai import generativelanguage as glm
 from langchain import PromptTemplate, LLMChain
@@ -15,6 +16,9 @@ with open('api.sty', 'r') as file:
     api_key = file.read().strip()
 
 
+memory = ConversationBufferMemory(k=2)
+
+
 #THis line is not use currently, i want the chat can remember context of 
 #A previous conversation which i can't right now so i use module to have access to context in palm.chat() 
 #Here's an example : 
@@ -29,14 +33,9 @@ with open('api.sty', 'r') as file:
 #     bot_response = response.last
 #     context = bot_response
 
-#     # Print user input in default color, and bot response in green
 #     print(f'[Bot]: {bot_response}')
 palm.configure(api_key=api_key)
 
-
-# Configure the Google API key
-client = glm.DiscussServiceClient(
-    client_options={'api_key':api_key})
 
 chat = ChatGooglePalm(
     model_name='models/chat-bison-001',
@@ -46,47 +45,52 @@ chat = ChatGooglePalm(
 )
 
 
+llm_chain = ConversationChain(
+    llm=chat,
+    verbose=True,
+    memory=memory
+)
+
+
 # Sample template
 template = """Question: {question}  
 Answer: Let's think step by step"""
 
+
 # Promt Template 
 prompt = PromptTemplate(template=template, input_variables=['question'])
 
-# Initiate LLM(currently not use)
-llm_chain = LLMChain(
-    prompt=prompt, 
-    llm=chat,
-    verbose=True
-)
 
-context = None
+# context = None
+
 
 # Create a function to generate AI response
 async def generate_ai_response(input_text):
-    global context
+    # global context
 
-    response = palm.chat(messages=input_text, context=context)
-    bot_response = response.last
-    context = bot_response
+    # response = palm.chat(messages=input_text, context=context)
+    # bot_response = response.last
+    # context = bot_response
 
-    # Extract the text of the response
-    response_text = bot_response 
+    # # Extract the text of the response
+    # response_text = bot_response 
 
-    # Create a dictionary with the response text
-    response_dict = {"text": response_text}
+    # # Create a dictionary with the response text
+    # response_dict = {"text": response_text}
 
-    # Serialize the dictionary as a JSON string
-    serialized_response = json.dumps(response_dict)
+
+    # # Serialize the dictionary as a JSON string
+    # serialized_response = json.dumps(response_dict)
+
 
     # Call the chain asynchronously (With langchain)
-    # res = await llm_chain.acall(message, callbacks=[cl.AsyncLangchainCallbackHandler()])
+    res = await llm_chain.acall(input_text, callbacks=[cl.AsyncLangchainCallbackHandler()])
 
 
-    return serialized_response
+    return str(res['response'])
 
     
-    # This is how to use the chatbot without LLM wrapper
+    # This is how to use the chatbot without LLM wrapper(low level module)
     # Do not delete this ---------------------------------------------------------
     # request = glm.GenerateMessageRequest(                                      |
     #     model='models/chat-bison-001',                                         |
@@ -96,7 +100,7 @@ async def generate_ai_response(input_text):
     #         messages=[glm.Message(content=input_text)]))                       |
     #                                                                            |        
     # result = client.generate_message(request)                                  |
-    # if result.candidates:  # Check if candidates list is not empty             |
+    # if result.candidates:           |
     #     return str(result.candidates[0].content)                               |
     # else:                                                                      |
     #     return "No response available."                                        |
@@ -129,6 +133,7 @@ async def start():
     actions = [
         cl.Action(name="Start Chat", value="Start chat", description="Click me!")
     ]
+
 
     await cl.Message(content="Click this button to start chat",author='Tool 1', actions=actions).send()
 
@@ -261,8 +266,7 @@ async def sendFile(action):
 
 
     response = await generate_ai_response(text)
-    response_dict = json.loads(response)
-    result = response_dict["text"]
+    result = response
 
 
     await cl.Message(
@@ -290,8 +294,7 @@ async def main(message: str):
 
 
     response = await generate_ai_response(message)
-    response_dict = json.loads(response)
-    result = response_dict["text"]
+    result = response
 
     #This line is used when not using llm_chain
     await cl.Message(content=result,author='Tool 1',actions=SendFile).send()
