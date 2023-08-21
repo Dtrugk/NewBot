@@ -1,15 +1,38 @@
 #Code start from there 
-import aiofiles
-import os
-import chainlit as cl 
-from google.ai import generativelanguage as glm
-import matplotlib.pyplot as plt
-from langchain import PromptTemplate, LLMChain
 from langchain.chat_models import ChatGooglePalm
+from google.ai import generativelanguage as glm
+from langchain import PromptTemplate, LLMChain
+import google.generativeai as palm
+import matplotlib.pyplot as plt
+import chainlit as cl
+import aiofiles
+import json
+import os
+
 
 # Read API key from the text file
 with open('api.sty', 'r') as file:
     api_key = file.read().strip()
+
+
+#THis line is not use currently, i want the chat can remember context of 
+#A previous conversation which i can't right now so i use module to have access to context in palm.chat() 
+#Here's an example : 
+# palm.configure(api_key=api)
+
+# context = None
+
+# while True:
+#     user_input = input(f'[User]: ')
+#     response = palm.chat(messages=user_input,
+#                         context=context)
+#     bot_response = response.last
+#     context = bot_response
+
+#     # Print user input in default color, and bot response in green
+#     print(f'[Bot]: {bot_response}')
+palm.configure(api_key=api_key)
+
 
 # Configure the Google API key
 client = glm.DiscussServiceClient(
@@ -22,6 +45,7 @@ chat = ChatGooglePalm(
     google_api_key=api_key
 )
 
+
 # Sample template
 template = """Question: {question}  
 Answer: Let's think step by step"""
@@ -29,25 +53,39 @@ Answer: Let's think step by step"""
 # Promt Template 
 prompt = PromptTemplate(template=template, input_variables=['question'])
 
-# Initiate LLM
+# Initiate LLM(currently not use)
 llm_chain = LLMChain(
     prompt=prompt, 
     llm=chat,
     verbose=True
 )
 
+context = None
 
 # Create a function to generate AI response
 async def generate_ai_response(input_text):
+    global context
 
-    res = await llm_chain.acall(input_text, callbacks= [cl.AsyncLangchainCallbackHandler()])
+    response = palm.chat(messages=input_text, context=context)
+    bot_response = response.last
+    context = bot_response
 
-    if res != None:
-        return res 
-    else : 
-        return "No response available"
+    # Extract the text of the response
+    response_text = bot_response 
+
+    # Create a dictionary with the response text
+    response_dict = {"text": response_text}
+
+    # Serialize the dictionary as a JSON string
+    serialized_response = json.dumps(response_dict)
+
+    # Call the chain asynchronously (With langchain)
+    # res = await llm_chain.acall(message, callbacks=[cl.AsyncLangchainCallbackHandler()])
+
+
+    return serialized_response
+
     
-
     # This is how to use the chatbot without LLM wrapper
     # Do not delete this ---------------------------------------------------------
     # request = glm.GenerateMessageRequest(                                      |
@@ -85,6 +123,8 @@ async def start():
         name="Tool 1",
         url="https://avatars.githubusercontent.com/u/128686189?s=400&u=a1d1553023f8ea0921fba0debbe92a8c5f840dd9&v=4",
     ).send()
+
+
     # Sending an action button within a chatbot message
     actions = [
         cl.Action(name="Start Chat", value="Start chat", description="Click me!")
@@ -148,6 +188,7 @@ async def sendIMG(action):
         elements= element,     
     ).send()
 
+
     # await cl.Message(
     #     content=result,
     #     actions=SendFile,
@@ -157,6 +198,7 @@ async def sendIMG(action):
 
 #-----------------------------------------------------------------------------------
 
+
 @cl.action_callback("Send file")
 async def sendFile(action):
     await cl.Avatar(
@@ -164,12 +206,15 @@ async def sendFile(action):
         url="https://avatars.githubusercontent.com/u/128686189?s=400&u=a1d1553023f8ea0921fba0debbe92a8c5f840dd9&v=4",
     ).send()
 
+
     SendFile = [
         cl.Action(name="Send file",value='Send file' ,description="Click me to send a file"),
         cl.Action(name="Send img",value='Send image' ,description="Click me to send an image"),
     ]
 
+
     files = None
+
 
     accepted_mime_types = {
     "text/plain": [".txt", ".py"],
@@ -215,11 +260,13 @@ async def sendFile(action):
     ).send()
 
 
-    result = await generate_ai_response(text)
+    response = await generate_ai_response(text)
+    response_dict = json.loads(response)
+    result = response_dict["text"]
 
 
     await cl.Message(
-        content=result['text'],
+        content=result,
         author='Tool 1',
         actions=SendFile
     ).send()
@@ -242,10 +289,15 @@ async def main(message: str):
     ]
 
 
-    result = await generate_ai_response(message)
+    response = await generate_ai_response(message)
+    response_dict = json.loads(response)
+    result = response_dict["text"]
 
+    #This line is used when not using llm_chain
+    await cl.Message(content=result,author='Tool 1',actions=SendFile).send()
 
-    await cl.Message(content=result['text'],author='Tool 1',actions=SendFile).send()
+    #THis line is used when using llm_chain 
+    # await cl.Message(content=result['text'],author='Tool 1',actions=SendFile).send()
 
 
 # Download file -------------------------------------------------------
