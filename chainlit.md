@@ -11,7 +11,8 @@
 
 ## Usage
 
-Chat. Currently can answer 1 question from processed file.Send Image just there for nothing. Actually i don't experienced enough to implement all that
+Chat. Currently can answer 1 question from processed file.Send Image func just there for nothing. Actually i don't experienced enough to implement all that
 so probably i gonna make this open source 
 Here's the API key: AIzaSyAUUg46ukjjBtZaiT9Sre_QK5lx7lES8K8
+codebase: https://github.com/Dtrugk/NewBot
 
