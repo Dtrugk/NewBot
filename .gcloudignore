@@ -1,0 +1,5 @@
+
+.vscode 
+/myenv
+__pycache__
+api.sty
