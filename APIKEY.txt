@@ -1,2 +1,65 @@
-[Your api key]
-and remember to change file name in line 10 of bot.py
+I was drawn to programming, science, technology and science fiction
+ever since I was a little kid. I can't say it's because I wanted to
+make the world a better place. Not really. I was simply drawn to it
+because I was drawn to it. Writing programs was fun. Figuring out how
+nature works was fascinating. Science fiction felt like a grand
+adventure.
+
+Then I started a software company and poured every ounce of energy
+into it. It failed. That hurt, but that part is ok. I made a lot of
+mistakes and learned from them. This experience made me much, much
+better. I'm satisfied with that.
+
+What's not ok is *how* things ended. Many of the investors turned out
+to be bloodthirsty vultures who tore the carcass to pieces. Had we
+IPO'ed, these same people would have stood there with giant smiles
+telling everyone how they'd always known we were special and how
+they'd supported us all along.
+
+I lost many friends. Throughout the whole thing I was lucky to meet
+many brilliant, creative, talented people. Together, we worked *so*
+hard. Now we don't talk.
+
+I spent a lot of time thinking about how I contributed to these failed
+relationships. I learned a lot from that too. It wasn't my finest
+hour, but I can sleep at night fine. So I eventually decided it's
+mostly nobody's fault. This is just the reality of what happens to
+people when extreme stress ends in failure.
+
+Then I worked for a tech giant, and then for a high-growth unicorn. It
+shocked me how dilbertesque they both were. Full of politicians, and
+burnt out engineers in golden handcuffs who can't wait to get out, and
+meaningless business speak, and checked out employees who pretend
+they're "excited" about everything all the time. The young, wide-eyed
+engineers seem hopelessly naive to me now.
+
+So the worst case scenario is that you get eaten by vultures and lose
+friends. And the best case scenario is that you're in a soulless
+machine that turns everyone into an automaton. I know that's not the
+whole picture. It's not even most of the picture. But that's the part
+I can't unsee.
+
+For a long time I couldn't focus on any remotely intellectual pursuit.
+I even thought I permanently damaged my brain. But eventually I
+started exercising, went on anti-depressants, and started therapy.
+Then I got a job that has nothing to do with technology. Slowly my
+happiness returned, and with it my ability to focus. I do a lot of
+sports now and hang out with my non-techy friends and my wife. I cook
+a lot. I got into knot theory. I find it fascinating and can do it for
+hours. I'm surprisingly not bad at it. So I know I still have my
+faculties.
+
+But I still can't program, can't write, can't think of new products,
+can't read science fiction. I'm mostly happy, but there is always a
+hint of dissatisfaction underneath. I miss the creative, optimistic
+person I once was. I want to see past the cynicism. I want to write
+programs and make things. I want to work with a ragtag team again to
+bring something to life that didn't exist before. I want to learn how
+to see past the bullshit and be creative again. But I can't get myself
+to do it. I hear the call and I know there's still a spark. But when I
+take even the smallest step everything turns bleak and mundane. It's
+like the magic has been bled out of me and I don't know how to summon
+it back.
+
+Has anyone been through this who managed to recover their optimism and
+creative spirit? Please help me. What can I do?

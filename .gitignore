@@ -5,3 +5,6 @@ test2.py
 __pycache__
 api.sty
 llm-intergration.py
+chromadb-impl.py
+Cbd.py
+imggen

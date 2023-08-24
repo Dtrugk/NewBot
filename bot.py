@@ -1,14 +1,19 @@
-from langchain.memory import ConversationBufferMemory
+from langchain.embeddings.google_palm import GooglePalmEmbeddings
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.vectorstores import Chroma
+from langchain.chains import RetrievalQAWithSourcesChain
+from langchain.memory import ConversationBufferMemory, ConversationBufferWindowMemory
 from langchain.chains import ConversationChain
+from langchain.prompts.chat import (
+    ChatPromptTemplate,
+    SystemMessagePromptTemplate,
+    HumanMessagePromptTemplate,
+)
 from langchain.chat_models import ChatGooglePalm
 from google.ai import generativelanguage as glm
 from langchain import PromptTemplate, LLMChain
 import google.generativeai as palm
-import matplotlib.pyplot as plt
 import chainlit as cl
-import aiofiles
-import json
-import os
 
 
 # Read API key from the text file
@@ -18,22 +23,29 @@ with open('api.sty', 'r') as file:
 
 memory = ConversationBufferMemory(k=2)
 
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 
-#THis line is not use currently, i want the chat can remember context of 
-#A previous conversation which i can't right now so i use module to have access to context in palm.chat() 
-#Here's an example : 
-# palm.configure(api_key=api)
+system_template = """Use the following pieces of context to answer the users question.
+If you don't know the answer, just say that you don't know, don't try to make up an answer.
+ALWAYS return a "SOURCES" part in your answer.
+The "SOURCES" part should be a reference to the source of the document from which you got your answer.
 
-# context = None
+Example of your response should be:
 
-# while True:
-#     user_input = input(f'[User]: ')
-#     response = palm.chat(messages=user_input,
-#                         context=context)
-#     bot_response = response.last
-#     context = bot_response
+```
+The answer is foo
+SOURCES: xyz
+```
 
-#     print(f'[Bot]: {bot_response}')
+Begin!
+----------------
+{summaries}"""
+messages = [
+    SystemMessagePromptTemplate.from_template(system_template),
+    HumanMessagePromptTemplate.from_template("{question}"),
+]
+
+
 palm.configure(api_key=api_key)
 
 
@@ -48,7 +60,7 @@ chat = ChatGooglePalm(
 llm_chain = ConversationChain(
     llm=chat,
     verbose=True,
-    memory=memory
+    memory=ConversationBufferWindowMemory(k=2)
 )
 
 
@@ -57,37 +69,23 @@ template = """Question: {question}
 Answer: Let's think step by step"""
 
 
-# Promt Template 
-prompt = PromptTemplate(template=template, input_variables=['question'])
-
-
-# context = None
+messages = [
+    SystemMessagePromptTemplate.from_template(system_template),
+    HumanMessagePromptTemplate.from_template("{question}"),
+]
+prompt = ChatPromptTemplate.from_messages(messages)
+chain_type_kwargs = {"prompt": prompt}
 
 
 # Create a function to generate AI response
 async def generate_ai_response(input_text):
-    # global context
 
-    # response = palm.chat(messages=input_text, context=context)
-    # bot_response = response.last
-    # context = bot_response
-
-    # # Extract the text of the response
-    # response_text = bot_response 
-
-    # # Create a dictionary with the response text
-    # response_dict = {"text": response_text}
-
-
-    # # Serialize the dictionary as a JSON string
-    # serialized_response = json.dumps(response_dict)
-
-
-    # Call the chain asynchronously (With langchain)
     res = await llm_chain.acall(input_text, callbacks=[cl.AsyncLangchainCallbackHandler()])
 
-
-    return str(res['response'])
+    if res != None:
+        return str(res['response'])
+    else:
+        return 'No response available'
 
     
     # This is how to use the chatbot without LLM wrapper(low level module)
@@ -100,7 +98,7 @@ async def generate_ai_response(input_text):
     #         messages=[glm.Message(content=input_text)]))                       |
     #                                                                            |        
     # result = client.generate_message(request)                                  |
-    # if result.candidates:           |
+    # if result.candidates:                                                      |
     #     return str(result.candidates[0].content)                               |
     # else:                                                                      |
     #     return "No response available."                                        |
@@ -177,7 +175,7 @@ async def sendIMG(action):
     image = cl.Image(
         name=img_file.name,
         display="inline",
-        size="large",
+        size="medium",
         content=img_file.content,  # Using the uploaded file's content directly
         actions=SendFile
     )
@@ -201,82 +199,115 @@ async def sendIMG(action):
     # ).send()
 
 
-#-----------------------------------------------------------------------------------
+#----------------------------------------File Processing-----------------------------------#
 
 
-@cl.action_callback("Send file")
-async def sendFile(action):
-    await cl.Avatar(
-        name="Tool 1",
-        url="https://avatars.githubusercontent.com/u/128686189?s=400&u=a1d1553023f8ea0921fba0debbe92a8c5f840dd9&v=4",
-    ).send()
+# Define a separate function to handle the Q&A process after sending the file
+async def handle_file_qna(file_name, texts, metadatas, embeddings, docsearch, chain, cb):
+    user_input = await cl.AskUserMessage(content=f"Processing `{file_name}` done. You can now ask questions!").send()
 
+    message = {
+        'question': user_input.get('content'),  
+    }
 
-    SendFile = [
-        cl.Action(name="Send file",value='Send file' ,description="Click me to send a file"),
-        cl.Action(name="Send img",value='Send image' ,description="Click me to send an image"),
-    ]
+    res = await chain.acall(message, callbacks=[cb])
 
+    input_data = {
+        'user_input': user_input.get('content')
+    }
 
+    combined_output = {
+        'answer': res['answer']
+    }
+
+    cb = cl.AsyncLangchainCallbackHandler(
+        stream_final_answer=True, answer_prefix_tokens=["FINAL", "ANSWER"]
+    )
+    cb.answer_reached = True
+
+    # Save the combined output to the memory
+    memory.save_context(inputs=input_data, outputs=combined_output)
+
+    answer = res["answer"]
+    sources = res["sources"].strip()
+    source_elements = []
+
+    all_sources = [m["source"] for m in metadatas]
+
+    if sources:
+        found_sources = []
+
+        # Add the sources to the message
+        for source in sources.split(","):
+            source_name = source.strip().replace(".", "")
+            # Get the index of the source
+            try:
+                index = all_sources.index(source_name)
+            except ValueError:
+                continue
+            text = texts[index]
+            found_sources.append(source_name)
+            # Create the text element referenced in the message
+            source_elements.append(cl.Text(content=text, name=source_name))
+
+        if found_sources:
+            answer += f"\nSources: {', '.join(found_sources)}"
+        else:
+            answer += "\nNo sources found"
+
+    if cb.has_streamed_final_answer:
+        cb.final_stream.elements = source_elements
+        await cb.final_stream.update()
+    else:
+        await cl.Message(content=answer, elements=source_elements).send()
+
+@cl.action_callback("Send file") #sendFile
+async def sendFile(m = memory):
     files = None
-
-
-    accepted_mime_types = {
-    "text/plain": [".txt", ".py"],
-    "text/csv": [".csv"],
-    "application/pdf": [".pdf"],
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
-}
-
 
     # Wait for the user to upload a file
     while files == None:
         files = await cl.AskFileMessage(
-            content="Please upload a text file to begin!", accept=accepted_mime_types
+            content="Please upload a text file to begin!", accept=["text/plain"]
         ).send()
 
+    file = files[0]
 
-    # Decode the file only with text-based file , with binary based type , i need to handle it diffirently 
-    text_file = files[0]
-    # Handle different file types differently
-    if text_file.type in {"text/plain":[".txt",".py"], "text/csv":[".csv"]}:
-        text = text_file.content.decode("utf-8")
-    elif text_file.type == "application/pdf":
-        # Handle PDF content extraction here
-        # text = extract_pdf_content(file.content)
-        pass
-    elif text_file.type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-        # Handle Excel content extraction here
-        # text = extract_excel_content(file.content)
-        pass
-    else:
-        await cl.Message(
-        content="Unsupported file type",
-        actions=SendFile
-        ).send()
+    msg = cl.Message(content=f"Processing `{file.name}`...")
+    await msg.send()
 
+    # Decode the file
+    text = file.content.decode("utf-8")
 
-    message_content = f"Content of `{text_file.name}`:\n{text}"
+    # Split the text into chunks
+    texts = text_splitter.split_text(text)
 
+    # Create a metadata for each chunk
+    metadatas = [{"source": f"{i}-pl"} for i in range(len(texts))]
 
-    # Let the user know that the system is ready
-    await cl.Message(
-        content=f"`{text_file.name}` uploaded, it contains {len(text)} characters!\n{message_content}",
-    ).send()
+    # Create a Chroma vector store
+    embeddings = GooglePalmEmbeddings(google_api_key=api_key)
+    docsearch = await cl.make_async(Chroma.from_texts)(
+        texts, embeddings, metadatas=metadatas
+    )
+    # Create a chain that uses the Chroma vector store
+    chain = RetrievalQAWithSourcesChain.from_chain_type(
+        ChatGooglePalm(temperature=0, google_api_key=api_key),
+        chain_type="stuff",
+        retriever=docsearch.as_retriever(),
+    )
 
+    cb = cl.AsyncLangchainCallbackHandler(
+        stream_final_answer=True, answer_prefix_tokens=["FINAL", "ANSWER"]
+    )
+    cb.answer_reached = True
 
-    response = await generate_ai_response(text)
-    result = response
-
-
-    await cl.Message(
-        content=result,
-        author='Tool 1',
-        actions=SendFile
-    ).send()
+    # Call the separate function to handle the Q&A process
+    await handle_file_qna(file.name, texts, metadatas, embeddings, docsearch, chain, cb)
 
 
-# Send and display messages on screen----------------------------------
+
+# Send and display messages on screen-----------------------------------Normal back-and-forth conversation
 @cl.on_message
 async def main(message: str):
 
@@ -299,21 +330,3 @@ async def main(message: str):
     #This line is used when not using llm_chain
     await cl.Message(content=result,author='Tool 1',actions=SendFile).send()
 
-    #THis line is used when using llm_chain 
-    # await cl.Message(content=result['text'],author='Tool 1',actions=SendFile).send()
-
-
-# Download file -------------------------------------------------------
-# @cl.on_chat_start
-# async def start():
-#     elements = [
-#         cl.File(
-#             name="test.py",
-#             path="./test.py",
-#             display="inline",
-#         ),
-#     ]
-#
-#     await cl.Message(
-#         content="This message has a file element", elements=elements
-#     ).send()
