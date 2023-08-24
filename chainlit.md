@@ -11,5 +11,7 @@
 
 ## Usage
 
-I want to create a chatbot that can `chat, process files, analyze image,etc,....` But for now, it can only chat. In the future, i'll try to make it can do more than just that.
+Chat. Currently can answer 1 question from processed file.Send Image just there for nothing. Actually i don't experienced enough to implement all that
+so probably i gonna make this open source 
+Here's the API key: AIzaSyAUUg46ukjjBtZaiT9Sre_QK5lx7lES8K8
 
